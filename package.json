@@ -4,13 +4,16 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "dotenv": "^16.5.0",
+    "envalid": "^8.0.0"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
     "@connectrpc/connect-node": "^2.0.2",
+    "@solana/web3.js": "^1.98.2",
     "@substreams/core": "^0.17.0",
     "@triton-one/yellowstone-grpc": "^4.0.2",
     "bs58": "^6.0.0",
