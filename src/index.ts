@@ -16,7 +16,7 @@ import { Data } from "@/types";
 const connection = new Connection(env.RPC_URL);
 const START_BLOCK = await connection.getSlot();
 const BATCH_SIZE = 50;
-const TOTAL_BATCHES = 1;
+const TOTAL_BATCHES = 20;
 
 const TOKEN = env.STREAMING_FAST_TOKEN;
 const ENDPOINT = "https://mainnet.sol.streamingfast.io:443";
