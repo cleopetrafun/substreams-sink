@@ -9,7 +9,9 @@ import {
 } from "@substreams/core";
 import { Package } from "@substreams/core/proto";
 import { Connection } from "@solana/web3.js";
+import { processTxn } from "@/handlers";
 import { env } from "@/config";
+import { Data } from "@/types";
 
 const connection = new Connection(env.RPC_URL);
 const START_BLOCK = await connection.getSlot();
@@ -47,21 +49,19 @@ const processBatch = async (
           typeRegistry: registry,
         }) as {
           mapOutput: {
-            data: any;
+            data: Data[];
           };
         };
 
         if (
           outputAsJson.mapOutput.data &&
-          outputAsJson.mapOutput.data.length >= 1 &&
-          outputAsJson.mapOutput.data[0]
+          outputAsJson.mapOutput.data.length >= 1
         ) {
-          console.log(JSON.stringify(outputAsJson.mapOutput.data, null, 2));
-          console.log("---".repeat(30));
+          await Promise.all(
+            outputAsJson.mapOutput.data.map((v) => processTxn(v))
+          );
         }
       }
-
-      break;
     }
   }
 };
