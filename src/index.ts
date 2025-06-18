@@ -19,7 +19,7 @@ const TOTAL_BATCHES = 1;
 const TOKEN = env.STREAMING_FAST_TOKEN;
 const ENDPOINT = "https://mainnet.sol.streamingfast.io:443";
 const SPKG =
-  "https://github.com/0xMukesh/test/raw/refs/heads/main/meteora-dlmm-v1-0-1-v1.0.1.spkg";
+  "https://github.com/cleopetrafun/spkgs/raw/refs/heads/main/meteora-dlmm-v1-0-1-v1.0.1.spkg";
 const MODULE = "map_block";
 
 const processBatch = async (
