@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import pg from "postgres";
 import { db, positionsTable } from "@/db";
 import { Data } from "@/types";
 
@@ -21,7 +22,7 @@ export const processTxn = async (data: Data) => {
     }
   }
 };
-``
+``;
 const handlePositionCreateEvent = async (data: Data) => {
   if (data.args.eventLog.positionCreateLogFields) {
     const parsedData = data.args.eventLog.positionCreateLogFields;
@@ -33,10 +34,15 @@ const handlePositionCreateEvent = async (data: Data) => {
         pool: parsedData.lbPair,
       });
     } catch (err) {
-      const e = err as Error;
-      console.log(
-        `[position-create] error occurred for ${parsedData.position} position: ${e.message}`
-      );
+      if (err instanceof pg.PostgresError) {
+        if (err.code === "23505") {
+          return;
+        } else {
+          console.log(
+            `[position-create] error occurred for ${parsedData.position} position: ${err}`
+          );
+        }
+      }
     }
   }
 };
@@ -68,9 +74,8 @@ const handleAddLiquidityEvent = async (data: Data) => {
           },
         });
     } catch (err) {
-      const e = err as Error;
       console.log(
-        `[add-liquidity] error occurred for ${parsedData.position} position: ${e.message}`
+        `[add-liquidity] error occurred for ${parsedData.position} position: ${err}`
       );
     }
   }
@@ -93,9 +98,8 @@ const handleRemoveLiquidityEvent = async (data: Data) => {
         })
         .where(eq(positionsTable.address, parsedData.position));
     } catch (err) {
-      const e = err as Error;
       console.log(
-        `[remove-liquidity] error occurred for ${parsedData.position} position: ${e.message}`
+        `[remove-liquidity] error occurred for ${parsedData.position} position: ${err}`
       );
     }
   }
@@ -114,9 +118,8 @@ const handleClaimFeeEvent = async (data: Data) => {
         })
         .where(eq(positionsTable.address, parsedData.position));
     } catch (err) {
-      const e = err as Error;
       console.log(
-        `[claim-fee] error occurred for ${parsedData.position} position: ${e.message}`
+        `[claim-fee] error occurred for ${parsedData.position} position: ${err}`
       );
     }
   }
@@ -131,9 +134,8 @@ const handlePositionCloseEvent = async (data: Data) => {
         .delete(positionsTable)
         .where(eq(positionsTable.address, parsedData.position));
     } catch (err) {
-      const e = err as Error;
       console.log(
-        `[position-close] error occurred for ${parsedData.position} position: ${e.message}`
+        `[position-close] error occurred for ${parsedData.position} position: ${err}`
       );
     }
   }

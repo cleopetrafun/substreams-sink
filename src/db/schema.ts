@@ -1,4 +1,4 @@
-import { pgTable, text, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, timestamp } from "drizzle-orm/pg-core";
 
 export const positionsTable = pgTable("positions", {
   address: text("address").primaryKey().notNull(),
@@ -10,4 +10,6 @@ export const positionsTable = pgTable("positions", {
   feeY: numeric("fee_y").default("0"),
   totalAmountInUsd: numeric("total_amount_usd").default("0"),
   totalFeesInUsd: numeric("total_fees_usd").default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
