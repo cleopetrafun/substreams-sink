@@ -1,0 +1,19 @@
+{
+  "name": "substream-sink",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@connectrpc/connect-node": "^2.0.2",
+    "@substreams/core": "^0.17.0",
+    "@triton-one/yellowstone-grpc": "^4.0.2",
+    "bs58": "^6.0.0",
+    "helius-laserstream": "^0.0.7"
+  }
+}
