@@ -1,10 +1,12 @@
 {
   "name": "substream-sink",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "private": true,
   "scripts": {
     "db:push": "drizzle-kit push",
-    "start": "ts-node src/index.ts"
+    "build": "tsup",
+    "watch": "tsup --watch",
+    "start": "node dist/index.mjs"
   },
   "devDependencies": {
     "@types/bn.js": "^5.2.0",
@@ -28,6 +30,7 @@
     "bn.js": "^5.2.2",
     "bs58": "^6.0.0",
     "drizzle-orm": "^0.44.2",
+    "ky": "^1.8.1",
     "pg": "^8.16.0",
     "postgres": "^3.4.7"
   }

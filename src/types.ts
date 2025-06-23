@@ -2,9 +2,13 @@ export type Data = {
   txId: string;
   blockTime: number;
   signer: string;
+  instructionIndex: number;
   outerProgram: string;
   instructionType: string;
   args: Args;
+  inputAccounts: {
+    position: string;
+  };
 };
 
 type Args = {
@@ -67,7 +71,7 @@ export enum ProgramType {
   DammV2,
 }
 
-export enum TxnType {
+export enum IxnType {
   Deposit = 0,
   Withdraw,
   ClaimFee,

@@ -6,6 +6,7 @@ import {
   boolean,
   real,
   integer,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const positionsTable = pgTable("positions", {
@@ -15,7 +16,6 @@ export const positionsTable = pgTable("positions", {
   program_type: integer("program_type").notNull(),
   total_token_x_amount: numeric("total_token_x_amount").default("0").notNull(),
   total_token_y_amount: numeric("total_token_y_amount").default("0").notNull(),
-  total_deposit_usd_amount: real("total_usd_amount").default(0).notNull(),
   initial_deposit_usd_amount: real("initial_deposit_usd_amount")
     .default(0)
     .notNull(),
@@ -27,13 +27,22 @@ export const positionsTable = pgTable("positions", {
   updated_at: timestamp("updated_at").defaultNow(),
 });
 
-export const txnsTable = pgTable("txns", {
-  signature: text("signature").primaryKey().notNull(),
-  position: text("position").notNull(),
-  txn_type: integer("txn_type").notNull(),
-  token_x_amount: numeric("token_x_amount").notNull(),
-  token_y_amount: numeric("token_y_amount").notNull(),
-  token_x_usd_amount: real("token_x_usd_amount").notNull(),
-  token_y_usd_amount: real("token_y_usd_amount").notNull(),
-  timestamp: timestamp("timestamp").defaultNow(),
-});
+export const ixnsTable = pgTable(
+  "ixns",
+  {
+    signature: text("signature").notNull(),
+    position: text("position").notNull(),
+    instruction_idx: integer("instruction_idx").notNull(),
+    ixn_type: integer("ixn_type").notNull(),
+    token_x_amount: numeric("token_x_amount").notNull(),
+    token_y_amount: numeric("token_y_amount").notNull(),
+    token_x_usd_amount: real("token_x_usd_amount").notNull(),
+    token_y_usd_amount: real("token_y_usd_amount").notNull(),
+    timestamp: timestamp("timestamp").defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.signature, table.instruction_idx],
+    }),
+  ]
+);

@@ -1,7 +1,11 @@
 import { eq, sql } from "drizzle-orm";
-import pg from "postgres";
-import { db, positionsTable, txnsTable } from "@/db";
-import { Data, ProgramType, TxnType } from "@/types";
+import { db, positionsTable, ixnsTable } from "@/db";
+import {
+  fetchDlmmPositionClaimFeesInfo,
+  fetchDlmmPositionDepositsInfo,
+  fetchDlmmPositionWithdrawsInfo,
+} from "@/helpers";
+import { Data, ProgramType, IxnType } from "@/types";
 
 export const processTxn = async (data: Data) => {
   if (
@@ -33,25 +37,21 @@ const handlePositionCreateEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.positionCreateLogFields;
 
     try {
-      await db.insert(positionsTable).values({
-        address: parsedData.position,
-        owner: parsedData.owner,
-        pool: parsedData.lbPair,
-        program_type: ProgramType.Dlmm,
-        created_at: new Date(data.blockTime * 1000),
-        updated_at: new Date(data.blockTime * 1000),
-      });
+      await db
+        .insert(positionsTable)
+        .values({
+          address: parsedData.position,
+          owner: parsedData.owner,
+          pool: parsedData.lbPair,
+          program_type: ProgramType.Dlmm,
+          created_at: new Date(data.blockTime * 1000),
+          updated_at: new Date(data.blockTime * 1000),
+        })
+        .onConflictDoNothing();
     } catch (err) {
-      if (err instanceof pg.PostgresError) {
-        // ignore unique constraint error
-        if (err.code === "23505") {
-          return;
-        } else {
-          console.log(
-            `[position-create] error occurred for ${parsedData.position} position: ${err}`
-          );
-        }
-      }
+      console.log(
+        `[position-create] error occurred for ${parsedData.position} position: ${err}`
+      );
     }
   }
 };
@@ -61,44 +61,72 @@ const handleAddLiquidityEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.addLiquidityLogFields;
 
     try {
-      await db
-        .insert(positionsTable)
-        .values({
+      const res = await fetchDlmmPositionDepositsInfo(parsedData.position);
+      if (!res) {
+        return;
+      }
+
+      const filteredValue = res.find((v) => v.tx_id === data.txId);
+      if (!filteredValue) {
+        console.log(
+          `[add-liquidity] failed to get dlmm deposits info for ${data.txId} txn`
+        );
+        return;
+      }
+
+      const position = await db.query.positionsTable.findFirst({
+        where: eq(positionsTable.address, parsedData.position),
+      });
+
+      if (!position) {
+        await db.insert(positionsTable).values({
           address: parsedData.position,
           owner: parsedData.from,
           pool: parsedData.lbPair,
           program_type: ProgramType.Dlmm,
           total_token_x_amount: parsedData.amounts[0],
           total_token_y_amount: parsedData.amounts[1],
+          initial_deposit_usd_amount:
+            filteredValue.token_x_usd_amount + filteredValue.token_y_usd_amount,
           created_at: new Date(data.blockTime * 1000),
           updated_at: new Date(data.blockTime * 1000),
-        })
-        .onConflictDoUpdate({
-          target: positionsTable.address,
-          set: {
+        });
+      } else {
+        if (position.initial_deposit_usd_amount === 0) {
+          await db
+            .update(positionsTable)
+            .set({
+              initial_deposit_usd_amount:
+                filteredValue.token_x_usd_amount +
+                filteredValue.token_y_usd_amount,
+            })
+            .where(eq(positionsTable.address, parsedData.position));
+        }
+
+        await db
+          .update(positionsTable)
+          .set({
             total_token_x_amount: sql`${
               positionsTable.total_token_x_amount
             } + ${sql.raw(parsedData.amounts[0])}`,
             total_token_y_amount: sql`${
               positionsTable.total_token_y_amount
             } + ${sql.raw(parsedData.amounts[1])}`,
-            updated_at: new Date(data.blockTime * 1000),
-          },
-        });
+          })
+          .where(eq(positionsTable.address, parsedData.position));
+      }
 
-      await db
-        .insert(txnsTable)
-        .values({
-          position: parsedData.position,
-          signature: data.txId,
-          token_x_amount: parsedData.amounts[0],
-          token_y_amount: parsedData.amounts[1],
-          token_x_usd_amount: 0,
-          token_y_usd_amount: 0,
-          txn_type: TxnType.Deposit,
-          timestamp: new Date(data.blockTime * 1000),
-        })
-        .onConflictDoNothing();
+      await db.insert(ixnsTable).values({
+        signature: data.txId,
+        instruction_idx: data.instructionIndex,
+        position: parsedData.position,
+        token_x_amount: parsedData.amounts[0],
+        token_y_amount: parsedData.amounts[1],
+        token_x_usd_amount: filteredValue.token_x_usd_amount,
+        token_y_usd_amount: filteredValue.token_y_usd_amount,
+        ixn_type: IxnType.Deposit,
+        timestamp: new Date(data.blockTime * 1000),
+      });
     } catch (err) {
       console.log(
         `[add-liquidity] error occurred for ${parsedData.position} position: ${err}`
@@ -112,7 +140,20 @@ const handleRemoveLiquidityEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.removeLiquidityLogFields;
 
     try {
-      await db
+      const res = await fetchDlmmPositionWithdrawsInfo(parsedData.position);
+      if (!res) {
+        return;
+      }
+
+      const filteredValue = res.find((v) => v.tx_id === data.txId);
+      if (!filteredValue) {
+        console.log(
+          `[remove-liquidity] failed to get dlmm withdraws info for ${data.txId} txn`
+        );
+        return;
+      }
+
+      const [position] = await db
         .update(positionsTable)
         .set({
           total_token_x_amount: sql`${
@@ -123,18 +164,22 @@ const handleRemoveLiquidityEvent = async (data: Data) => {
           } - ${sql.raw(parsedData.amounts[1])}`,
           updated_at: new Date(data.blockTime * 1000),
         })
-        .where(eq(positionsTable.address, parsedData.position));
+        .where(eq(positionsTable.address, parsedData.position))
+        .returning();
 
-      await db.insert(txnsTable).values({
-        position: parsedData.position,
-        signature: data.txId,
-        token_x_amount: parsedData.amounts[0],
-        token_y_amount: parsedData.amounts[1],
-        token_x_usd_amount: 0,
-        token_y_usd_amount: 0,
-        txn_type: TxnType.Withdraw,
-        timestamp: new Date(data.blockTime * 1000),
-      });
+      if (position) {
+        await db.insert(ixnsTable).values({
+          signature: data.txId,
+          position: parsedData.position,
+          instruction_idx: data.instructionIndex,
+          token_x_amount: parsedData.amounts[0],
+          token_y_amount: parsedData.amounts[1],
+          token_x_usd_amount: filteredValue.token_x_usd_amount,
+          token_y_usd_amount: filteredValue.token_y_usd_amount,
+          ixn_type: IxnType.Withdraw,
+          timestamp: new Date(data.blockTime * 1000),
+        });
+      }
     } catch (err) {
       console.log(
         `[remove-liquidity] error occurred for ${parsedData.position} position: ${err}`
@@ -148,41 +193,51 @@ const handleClaimFeeEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.claimFeeLogFields;
 
     try {
-      await db
-        .insert(positionsTable)
-        .values({
-          address: parsedData.position,
-          owner: parsedData.owner,
-          pool: parsedData.lbPair,
-          total_fee_x_claimed: parsedData.feeX,
-          total_fee_y_claimed: parsedData.feeY,
-          program_type: ProgramType.Dlmm,
-          created_at: new Date(data.blockTime * 1000),
+      const res = await fetchDlmmPositionClaimFeesInfo(parsedData.position);
+      if (!res) {
+        return;
+      }
+
+      const filteredValue = res.find((v) => v.tx_id === data.txId);
+      if (!filteredValue) {
+        console.log(
+          `[claim-fees] failed to get dlmm claim fees info for ${data.txId} txn`
+        );
+        return;
+      }
+
+      const [position] = await db
+        .update(positionsTable)
+        .set({
+          total_fee_x_claimed: sql`${
+            positionsTable.total_fee_x_claimed
+          } + ${sql.raw(parsedData.feeX)}`,
+          total_fee_y_claimed: sql`${
+            positionsTable.total_fee_y_claimed
+          } + ${sql.raw(parsedData.feeY)}`,
+          total_fee_usd_claimed: sql`${
+            positionsTable.total_fee_usd_claimed
+          } + ${
+            filteredValue.token_x_usd_amount + filteredValue.token_y_usd_amount
+          }`,
           updated_at: new Date(data.blockTime * 1000),
         })
-        .onConflictDoUpdate({
-          target: positionsTable.address,
-          set: {
-            total_fee_x_claimed: sql`${
-              positionsTable.total_fee_x_claimed
-            } + ${sql.raw(parsedData.feeX)}`,
-            total_fee_y_claimed: sql`${
-              positionsTable.total_fee_y_claimed
-            } + ${sql.raw(parsedData.feeY)}`,
-            updated_at: new Date(data.blockTime * 1000),
-          },
-        });
+        .where(eq(positionsTable.address, parsedData.position))
+        .returning();
 
-      await db.insert(txnsTable).values({
-        position: parsedData.position,
-        signature: data.txId,
-        token_x_amount: parsedData.feeX,
-        token_y_amount: parsedData.feeY,
-        token_x_usd_amount: 0,
-        token_y_usd_amount: 0,
-        txn_type: TxnType.ClaimFee,
-        timestamp: new Date(data.blockTime * 1000),
-      });
+      if (position) {
+        await db.insert(ixnsTable).values({
+          position: parsedData.position,
+          signature: data.txId,
+          instruction_idx: data.instructionIndex,
+          token_x_amount: parsedData.feeX,
+          token_y_amount: parsedData.feeY,
+          token_x_usd_amount: filteredValue.token_x_usd_amount,
+          token_y_usd_amount: filteredValue.token_y_usd_amount,
+          ixn_type: IxnType.ClaimFee,
+          timestamp: new Date(data.blockTime * 1000),
+        });
+      }
     } catch (err) {
       console.log(
         `[claim-fee] error occurred for ${parsedData.position} position: ${err}`
@@ -196,13 +251,36 @@ const handlePositionCloseEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.positionCloseLogFields;
 
     try {
-      await db
+      const [position] = await db
         .update(positionsTable)
         .set({
           is_active: false,
           updated_at: new Date(data.blockTime * 1000),
         })
-        .where(eq(positionsTable.address, parsedData.position));
+        .where(eq(positionsTable.address, parsedData.position))
+        .returning();
+
+      const ixns = await db.query.ixnsTable.findMany({
+        where: eq(ixnsTable.position, parsedData.position),
+        columns: {
+          token_x_usd_amount: true,
+          token_y_usd_amount: true,
+        },
+      });
+      const totalWithdrawUsd = ixns.reduce(
+        (sum, ixn) => sum + ixn.token_x_usd_amount + ixn.token_y_usd_amount,
+        0
+      );
+
+      if (position) {
+        console.log(
+          `PnL - ${
+            totalWithdrawUsd +
+            position.total_fee_usd_claimed -
+            position.initial_deposit_usd_amount
+          }`
+        );
+      }
     } catch (err) {
       console.log(
         `[position-close] error occurred for ${parsedData.position} position: ${err}`
