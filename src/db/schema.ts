@@ -1,15 +1,39 @@
-import { pgTable, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  numeric,
+  timestamp,
+  boolean,
+  real,
+  integer,
+} from "drizzle-orm/pg-core";
 
 export const positionsTable = pgTable("positions", {
   address: text("address").primaryKey().notNull(),
-  pool: text("pool").notNull(),
   owner: text("owner").notNull(),
-  amountX: numeric("amount_x").default("0"),
-  amountY: numeric("amount_y").default("0"),
-  feeX: numeric("fee_x").default("0"),
-  feeY: numeric("fee_y").default("0"),
-  totalAmountInUsd: numeric("total_amount_usd").default("0"),
-  totalFeesInUsd: numeric("total_fees_usd").default("0"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  pool: text("pool").notNull(),
+  program_type: integer("program_type").notNull(),
+  total_token_x_amount: numeric("total_token_x_amount").default("0").notNull(),
+  total_token_y_amount: numeric("total_token_y_amount").default("0").notNull(),
+  total_deposit_usd_amount: real("total_usd_amount").default(0).notNull(),
+  initial_deposit_usd_amount: real("initial_deposit_usd_amount")
+    .default(0)
+    .notNull(),
+  total_fee_x_claimed: numeric("total_fee_x_claimed").default("0").notNull(),
+  total_fee_y_claimed: numeric("total_fee_y_claimed").default("0").notNull(),
+  total_fee_usd_claimed: real("total_fee_usd_claimed").default(0).notNull(),
+  is_active: boolean("is_active").default(true),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+export const txnsTable = pgTable("txns", {
+  signature: text("signature").primaryKey().notNull(),
+  position: text("position").notNull(),
+  txn_type: integer("txn_type").notNull(),
+  token_x_amount: numeric("token_x_amount").notNull(),
+  token_y_amount: numeric("token_y_amount").notNull(),
+  token_x_usd_amount: real("token_x_usd_amount").notNull(),
+  token_y_usd_amount: real("token_y_usd_amount").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
 });

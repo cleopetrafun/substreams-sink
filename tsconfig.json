@@ -17,11 +17,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "allowJs": true,
-    "types": ["bun-types"],
-    "baseUrl": ".",
-    "paths": {
-      "@": ["src/"],
-      "@/*": ["src/*"]
-    }
-  }
+    "baseUrl": "."
+  },
+  "include": ["src/**/*"]
 }

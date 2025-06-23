@@ -1,5 +1,6 @@
 export type Data = {
   txId: string;
+  blockTime: number;
   signer: string;
   outerProgram: string;
   instructionType: string;
@@ -60,3 +61,14 @@ type AddLiquidityByStrategy2Fields = {
     };
   };
 };
+
+export enum ProgramType {
+  Dlmm = 0,
+  DammV2,
+}
+
+export enum TxnType {
+  Deposit = 0,
+  Withdraw,
+  ClaimFee,
+}
