@@ -16,7 +16,7 @@ export const positionsTable = pgTable("positions", {
   program_type: integer("program_type").notNull(),
   total_token_x_amount: numeric("total_token_x_amount").default("0").notNull(),
   total_token_y_amount: numeric("total_token_y_amount").default("0").notNull(),
-  initial_deposit_usd_amount: real("initial_deposit_usd_amount")
+  total_deposit_usd_amount: real("total_deposit_usd_amount")
     .default(0)
     .notNull(),
   total_fee_x_claimed: numeric("total_fee_x_claimed").default("0").notNull(),

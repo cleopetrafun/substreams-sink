@@ -79,54 +79,40 @@ const handleAddLiquidityEvent = async (data: Data) => {
       });
 
       if (!position) {
-        await db.insert(positionsTable).values({
-          address: parsedData.position,
-          owner: parsedData.from,
-          pool: parsedData.lbPair,
-          program_type: ProgramType.Dlmm,
-          total_token_x_amount: parsedData.amounts[0],
-          total_token_y_amount: parsedData.amounts[1],
-          initial_deposit_usd_amount:
-            filteredValue.token_x_usd_amount + filteredValue.token_y_usd_amount,
-          created_at: new Date(data.blockTime * 1000),
-          updated_at: new Date(data.blockTime * 1000),
-        });
-      } else {
-        if (position.initial_deposit_usd_amount === 0) {
-          await db
-            .update(positionsTable)
-            .set({
-              initial_deposit_usd_amount:
-                filteredValue.token_x_usd_amount +
-                filteredValue.token_y_usd_amount,
-            })
-            .where(eq(positionsTable.address, parsedData.position));
-        }
-
-        await db
-          .update(positionsTable)
-          .set({
-            total_token_x_amount: sql`${
-              positionsTable.total_token_x_amount
-            } + ${sql.raw(parsedData.amounts[0])}`,
-            total_token_y_amount: sql`${
-              positionsTable.total_token_y_amount
-            } + ${sql.raw(parsedData.amounts[1])}`,
-          })
-          .where(eq(positionsTable.address, parsedData.position));
+        return;
       }
 
-      await db.insert(ixnsTable).values({
-        signature: data.txId,
-        instruction_idx: data.instructionIndex,
-        position: parsedData.position,
-        token_x_amount: parsedData.amounts[0],
-        token_y_amount: parsedData.amounts[1],
-        token_x_usd_amount: filteredValue.token_x_usd_amount,
-        token_y_usd_amount: filteredValue.token_y_usd_amount,
-        ixn_type: IxnType.Deposit,
-        timestamp: new Date(data.blockTime * 1000),
-      });
+      const positions = await db
+        .update(positionsTable)
+        .set({
+          total_token_x_amount: sql`${
+            positionsTable.total_token_x_amount
+          } + ${sql.raw(parsedData.amounts[0])}`,
+          total_token_y_amount: sql`${
+            positionsTable.total_token_y_amount
+          } + ${sql.raw(parsedData.amounts[1])}`,
+          total_deposit_usd_amount: sql`${
+            positionsTable.total_deposit_usd_amount
+          } + ${
+            filteredValue.token_x_usd_amount + filteredValue.token_y_usd_amount
+          }`,
+        })
+        .where(eq(positionsTable.address, parsedData.position))
+        .returning();
+
+      if (positions.length > 0) {
+        await db.insert(ixnsTable).values({
+          signature: data.txId,
+          instruction_idx: data.instructionIndex,
+          position: parsedData.position,
+          token_x_amount: parsedData.amounts[0],
+          token_y_amount: parsedData.amounts[1],
+          token_x_usd_amount: filteredValue.token_x_usd_amount,
+          token_y_usd_amount: filteredValue.token_y_usd_amount,
+          ixn_type: IxnType.Deposit,
+          timestamp: new Date(data.blockTime * 1000),
+        });
+      }
     } catch (err) {
       console.log(
         `[add-liquidity] error occurred for ${parsedData.position} position: ${err}`
@@ -251,36 +237,13 @@ const handlePositionCloseEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.positionCloseLogFields;
 
     try {
-      const [position] = await db
+      await db
         .update(positionsTable)
         .set({
           is_active: false,
           updated_at: new Date(data.blockTime * 1000),
         })
-        .where(eq(positionsTable.address, parsedData.position))
-        .returning();
-
-      const ixns = await db.query.ixnsTable.findMany({
-        where: eq(ixnsTable.position, parsedData.position),
-        columns: {
-          token_x_usd_amount: true,
-          token_y_usd_amount: true,
-        },
-      });
-      const totalWithdrawUsd = ixns.reduce(
-        (sum, ixn) => sum + ixn.token_x_usd_amount + ixn.token_y_usd_amount,
-        0
-      );
-
-      if (position) {
-        console.log(
-          `PnL - ${
-            totalWithdrawUsd +
-            position.total_fee_usd_claimed -
-            position.initial_deposit_usd_amount
-          }`
-        );
-      }
+        .where(eq(positionsTable.address, parsedData.position));
     } catch (err) {
       console.log(
         `[position-close] error occurred for ${parsedData.position} position: ${err}`

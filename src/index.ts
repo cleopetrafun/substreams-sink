@@ -8,6 +8,7 @@ import {
 } from "@substreams/core";
 import { Package } from "@substreams/core/proto";
 import { Connection } from "@solana/web3.js";
+import pLimit from "p-limit";
 import { processTxn } from "@/handlers";
 import { env } from "@/config";
 import { Data } from "@/types";
@@ -85,16 +86,25 @@ const main = async () => {
   let stop = env.STOP_BLOCK;
 
   if (start !== -1 && stop !== -1) {
-    try {
-      await processBatch(pkg, transport, registry, start, stop);
-    } catch (e) {
-      console.error(
-        `error while processing blocks from ${start} to ${stop}`,
-        e
+    const subBatchSize = 150;
+    const concurrency = 10;
+
+    const limit = pLimit(concurrency);
+    const promises: Promise<void>[] = [];
+
+    for (let s = start; s < stop; s += subBatchSize) {
+      const e = Math.min(stop, s + subBatchSize);
+      promises.push(
+        limit(() =>
+          processBatch(pkg, transport, registry, s, e).catch((err) => {
+            console.error(`error processing batch from ${s} to ${e}`, err);
+          })
+        )
       );
     }
 
-    console.log(`processed all the blocks from ${start} to ${stop}`);
+    await Promise.all(promises);
+    console.log(`finished processing blocks from ${start} to ${stop}`);
   } else if (start == -1) {
     start = await connection.getSlot();
 
