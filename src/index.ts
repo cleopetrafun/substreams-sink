@@ -8,9 +8,9 @@ import {
 } from "@substreams/core";
 import { Package } from "@substreams/core/proto";
 import { Connection } from "@solana/web3.js";
-import { processTxn } from "./handlers";
-import { env } from "./config";
-import { Data } from "./types";
+import { processTxn } from "@/handlers";
+import { env } from "@/config";
+import { Data } from "@/types";
 
 const connection = new Connection(env.RPC_URL);
 const BATCH_SIZE = 50;

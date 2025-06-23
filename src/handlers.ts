@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import pg from "postgres";
-import { db, positionsTable, txnsTable } from "./db";
-import { Data, ProgramType, TxnType } from "./types";
+import { db, positionsTable, txnsTable } from "@/db";
+import { Data, ProgramType, TxnType } from "@/types";
 
 export const processTxn = async (data: Data) => {
   if (

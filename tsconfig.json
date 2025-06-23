@@ -17,7 +17,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "allowJs": true,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@": ["src/"],
+      "@/*": ["src/*"]
+    }
   },
   "include": ["src/**/*"]
 }
