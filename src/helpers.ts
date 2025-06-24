@@ -98,3 +98,12 @@ export const fetchDlmmPositionClaimFeesInfo = async (
     }
   });
 };
+
+export const setCursor = async (cursor: string) => {
+  await redis.set("substreams:cursor", cursor);
+};
+
+export const loadCursor = async () => {
+  const res = await redis.get("substreams:cursor");
+  return res;
+};

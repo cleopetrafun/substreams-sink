@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { cleanEnv, num, str, url } from "envalid";
+import { bool, cleanEnv, num, str, url } from "envalid";
 
 export const env = cleanEnv(process.env, {
   STREAMING_FAST_TOKEN: str(),
@@ -12,5 +12,8 @@ export const env = cleanEnv(process.env, {
   }),
   STOP_BLOCK: num({
     default: -1,
+  }),
+  USE_CURSOR: bool({
+    default: false,
   }),
 });

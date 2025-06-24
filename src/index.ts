@@ -7,15 +7,10 @@ import {
   streamBlocks,
 } from "@substreams/core";
 import { Package } from "@substreams/core/proto";
-import { Connection } from "@solana/web3.js";
-import pLimit from "p-limit";
 import { processTxn } from "@/handlers";
+import { loadCursor, setCursor } from "@/helpers";
 import { env } from "@/config";
 import { Data } from "@/types";
-
-const connection = new Connection(env.RPC_URL);
-const BATCH_SIZE = 50;
-const TOTAL_BATCHES = 2;
 
 const TOKEN = env.STREAMING_FAST_TOKEN;
 const ENDPOINT = "https://mainnet.sol.streamingfast.io:443";
@@ -30,17 +25,30 @@ const processBatch = async (
   start: number,
   stop: number
 ) => {
-  console.log(`processing blocks from ${start} to ${stop}`);
+  console.log(`processing blocks ${start} to ${stop}`);
+
+  const cursor = await loadCursor();
+  if (!cursor && env.USE_CURSOR) {
+    console.log(`failed to load cursor. exiting...`);
+    return;
+  }
+
   const request = createRequest({
     substreamPackage: pkg,
     outputModule: MODULE,
     startBlockNum: start,
     stopBlockNum: stop,
+    productionMode: true,
+    finalBlocksOnly: true,
+    startCursor: env.USE_CURSOR ? cursor ?? undefined : undefined,
   });
 
   for await (const response of streamBlocks(transport, request)) {
     if (response.message.case === "blockScopedData") {
       const block = response.message.value;
+      const cursor = block.cursor;
+
+      await setCursor(cursor);
 
       if (block.output) {
         const outputAsJson = block.output.toJson({
@@ -62,18 +70,18 @@ const processBatch = async (
       }
     }
   }
+
+  console.log(`processed batch from ${start} to ${stop}`);
 };
 
 const main = async () => {
   const pkg = await fetchSubstream(SPKG);
   if (!pkg.modules) {
-    console.log(
-      "the given substream package doesn't have any modules. exiting..."
-    );
+    console.log("no modules found in the substream package. Exiting...");
     return;
   }
-  const registry = createRegistry(pkg);
 
+  const registry = createRegistry(pkg);
   const transport = createConnectTransport({
     httpVersion: "2",
     baseUrl: ENDPOINT,
@@ -86,48 +94,23 @@ const main = async () => {
   let stop = env.STOP_BLOCK;
 
   if (start !== -1 && stop !== -1) {
-    const subBatchSize = 150;
-    const concurrency = 10;
-
-    const limit = pLimit(concurrency);
-    const promises: Promise<void>[] = [];
-
-    for (let s = start; s < stop; s += subBatchSize) {
-      const e = Math.min(stop, s + subBatchSize);
-      promises.push(
-        limit(() =>
-          processBatch(pkg, transport, registry, s, e).catch((err) => {
-            console.error(`error processing batch from ${s} to ${e}`, err);
-          })
-        )
-      );
-    }
-
-    await Promise.all(promises);
-    console.log(`finished processing blocks from ${start} to ${stop}`);
-  } else if (start == -1) {
-    start = await connection.getSlot();
-
-    for (let batch = 0; batch < TOTAL_BATCHES; batch++) {
-      start += batch * BATCH_SIZE;
-      stop = start + BATCH_SIZE;
-
-      let success = false;
-      while (!success) {
-        try {
-          await processBatch(pkg, transport, registry, start, stop);
-          success = true;
-        } catch (e) {
-          console.error(`error in batch ${batch}, retrying...`, e);
-          await new Promise((r) => setTimeout(r, 2000));
-        }
-      }
-    }
-
-    console.log(
-      `processed ${BATCH_SIZE} batches from ${start} block with a batch size of ${BATCH_SIZE}`
-    );
+    // runs with `productionMode` as true, which spins off a bunch of parallel exeuction which stays in the limit of resource quota
+    await processBatch(pkg, transport, registry, start, stop);
   }
+
+  // TODO: figure out real time processing strategy
+
+  // else if (start === -1) {
+  //   const currentSlot = await connection.getSlot();
+  //   const tasks = Array.from({ length: 2 }).map((_, i) => {
+  //     const s = currentSlot + i * BATCH_SIZE;
+  //     const e = s + BATCH_SIZE;
+  //     return { start: s, stop: e };
+  //   });
+
+  //   await scheduleWithConcurrency(tasks, pkg, transport, registry);
+  //   console.log(`finished live mode batch processing from ${currentSlot}`);
+  // }
 };
 
 main();

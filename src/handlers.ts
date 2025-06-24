@@ -61,6 +61,13 @@ const handleAddLiquidityEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.addLiquidityLogFields;
 
     try {
+      const alreadyProcessed = await db.query.ixnsTable.findFirst({
+        where: eq(ixnsTable.signature, data.txId),
+      });
+      if (alreadyProcessed) {
+        return;
+      }
+
       const res = await fetchDlmmPositionDepositsInfo(parsedData.position);
       if (!res) {
         return;
@@ -77,7 +84,6 @@ const handleAddLiquidityEvent = async (data: Data) => {
       const position = await db.query.positionsTable.findFirst({
         where: eq(positionsTable.address, parsedData.position),
       });
-
       if (!position) {
         return;
       }
@@ -126,6 +132,13 @@ const handleRemoveLiquidityEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.removeLiquidityLogFields;
 
     try {
+      const alreadyProcessed = await db.query.ixnsTable.findFirst({
+        where: eq(ixnsTable.signature, data.txId),
+      });
+      if (alreadyProcessed) {
+        return;
+      }
+
       const res = await fetchDlmmPositionWithdrawsInfo(parsedData.position);
       if (!res) {
         return;
@@ -179,6 +192,13 @@ const handleClaimFeeEvent = async (data: Data) => {
     const parsedData = data.args.eventLog.claimFeeLogFields;
 
     try {
+      const alreadyProcessed = await db.query.ixnsTable.findFirst({
+        where: eq(ixnsTable.signature, data.txId),
+      });
+      if (alreadyProcessed) {
+        return;
+      }
+
       const res = await fetchDlmmPositionClaimFeesInfo(parsedData.position);
       if (!res) {
         return;
