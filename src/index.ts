@@ -8,7 +8,7 @@ import {
 } from "@substreams/core";
 import { Package } from "@substreams/core/proto";
 import { processTxn } from "@/handlers";
-import { loadCursor, setCursor } from "@/helpers";
+// import { loadCursor, setCursor } from "@/helpers";
 import { env } from "@/config";
 import { Data } from "@/types";
 
@@ -27,11 +27,11 @@ const processBatch = async (
 ) => {
   console.log(`processing blocks ${start} to ${stop}`);
 
-  const cursor = await loadCursor();
-  if (!cursor && env.USE_CURSOR) {
-    console.log(`failed to load cursor. exiting...`);
-    return;
-  }
+  // const cursor = await loadCursor();
+  // if (!cursor && env.USE_CURSOR) {
+  //   console.log(`failed to load cursor. exiting...`);
+  //   return;
+  // }
 
   const request = createRequest({
     substreamPackage: pkg,
@@ -40,7 +40,7 @@ const processBatch = async (
     stopBlockNum: stop,
     productionMode: true,
     finalBlocksOnly: true,
-    startCursor: env.USE_CURSOR ? cursor ?? undefined : undefined,
+    // startCursor: env.USE_CURSOR ? cursor ?? undefined : undefined,
   });
 
   for await (const response of streamBlocks(transport, request)) {
@@ -48,7 +48,7 @@ const processBatch = async (
       const block = response.message.value;
       const cursor = block.cursor;
 
-      await setCursor(cursor);
+      // await setCursor(cursor);
 
       if (block.output) {
         const outputAsJson = block.output.toJson({

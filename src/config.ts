@@ -3,10 +3,10 @@ import { bool, cleanEnv, num, str, url } from "envalid";
 
 export const env = cleanEnv(process.env, {
   STREAMING_FAST_TOKEN: str(),
-  RPC_URL: url(),
+  // RPC_URL: url(),
   DATABASE_URL: url(),
-  REDIS_URL: url(),
-  METEORA_DLMM_API_KEY: str(),
+  // REDIS_URL: url(),
+  // METEORA_DLMM_API_KEY: str(),
   START_BLOCK: num({
     default: -1,
   }),
